@@ -7,6 +7,8 @@ import (
 	"github.com/google/uuid"
 )
 
+// posibly to be deleted
+
 func (cfg *apiConfig) handlerThumbnailGet(w http.ResponseWriter, r *http.Request) {
 	videoIDString := r.PathValue("videoID")
 	videoID, err := uuid.Parse(videoIDString)
