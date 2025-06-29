@@ -124,11 +124,35 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	fileKey := getAssetPath(mediaType)
 	fileKeyWithPrefix := getAssetPathWithPrefix(prefix, fileKey)
 
+	// process the video for fast encoding
+	processedFilePath, err := processVidoeForFastStart(tempFile.Name())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error processing video for fast start", err)
+		return
+	}
+
+	// IMPORTANT: Ensure the processed temporary file is deleted after use
+	defer func() {
+		if rErr := os.Remove(processedFilePath); rErr != nil {
+			fmt.Printf("Error deleting processed temp file %s: %v\n", processedFilePath, rErr)
+		} else {
+			fmt.Printf("Deleted processed temp file: %s\n", processedFilePath)
+		}
+	}()
+
+	// Open the processed video file for S3 upload
+	processedFile, err := os.Open(processedFilePath)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error opening processed file", err)
+		return
+	}
+	defer processedFile.Close()
+
 	// put the object into s3 using PutObject
 	item := &s3.PutObjectInput{
 		Bucket:      aws.String(cfg.s3Bucket),
 		Key:         aws.String(fileKeyWithPrefix),
-		Body:        tempFile,
+		Body:        processedFile,
 		ContentType: aws.String(mediaType),
 	}
 
@@ -138,8 +162,8 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	videoURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", cfg.s3Bucket, cfg.s3Region, fileKeyWithPrefix)
-	video.VideoURL = &videoURL
+	video.VideoURL = aws.String(fmt.Sprintf("%s/%s", cfg.s3CfDistribution, fileKeyWithPrefix))
+
 	err = cfg.db.UpdateVideo(video)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't update video", err)

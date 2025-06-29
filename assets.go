@@ -123,3 +123,60 @@ func getVideoAspectRatio(filePath string) (string, error) {
 	// If it's neither 16:9 nor 9:16, return "other".
 	return "other", nil
 }
+
+func processVidoeForFastStart(filePath string) (string, error) {
+	newFilePath := filePath + ".processing"
+	cmd := exec.Command("ffmpeg", "-i", filePath, "-c", "copy", "-movflags", "faststart", "-f", "mp4", newFilePath)
+
+	err := cmd.Run()
+	if err != nil {
+		return "", fmt.Errorf("failed to run ffmpeg command: %w", err)
+	}
+
+	return newFilePath, nil
+}
+
+/*
+func generatePresignedURL(s3Client *s3.Client, bucket, key string, expireTime time.Duration) (string, error) {
+	presignedClient := s3.NewPresignClient(s3Client)
+
+	resp, err := presignedClient.PresignGetObject(context.TODO(),
+		&s3.GetObjectInput{
+			Bucket: aws.String(bucket),
+			Key:    aws.String(key),
+		},
+		s3.WithPresignExpires(expireTime),
+	)
+	if err != nil {
+		return "", err
+	}
+
+	// Return the generated URL
+	return resp.URL, nil
+}
+
+func (cfg *apiConfig) dbVideoToSignedVideo(video database.Video) (database.Video, error) {
+	if video.VideoURL == nil {
+		return database.Video{}, fmt.Errorf("video URL is nil for video '%s'", video.ID)
+	}
+	parts := strings.SplitN(*video.VideoURL, ",", 2)
+	if len(parts) != 2 {
+		return database.Video{}, fmt.Errorf("invalid video URL format: expected 'bucket,key', got '%s'", *video.VideoURL)
+	}
+
+	bucket := strings.TrimSpace(parts[0])
+	key := strings.TrimSpace(parts[1])
+
+	// generate presigned url
+	const presignExpiration = 15 * time.Minute
+	presignedURL, err := generatePresignedURL(cfg.sp3Client, bucket, key, presignExpiration)
+	if err != nil {
+		return database.Video{}, fmt.Errorf("failed to generate presigned URL for video '%s': %w", video.ID, err)
+	}
+
+	// Set the VideoURL field of the video to the presigned URL
+	video.VideoURL = &presignedURL
+
+	return video, nil
+}
+*/
